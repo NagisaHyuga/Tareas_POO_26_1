@@ -1,0 +1,193 @@
+Documentación de Tarea: Cámara de Seguimiento para Bola de Boliche
+Este documento contiene la interacción completa con la IA para solicitar la solución a un problema de seguimiento de cámara en Unity, la guía de implementación y el código final.
+
+1. Solicitud (Prompt) Enviado a la IA
+Rol Solicitado: Desarrollador de videojuegos de Unity 3D.
+
+Problema Expuesto: "Estoy realizando un juego de boliche 3D, quiero una cámara de seguimiento para la bola de boliche. Basado en el siguiente código [CÓDIGO DE CONTROLBOLA ORIGINAL] dame una guía paso a paso de cómo implementarlo en unity. Y dame el código completo para la cámara y la bola."
+
+Código de ControlBola Original:
+
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.Rendering;
+
+public class ControlBola : MonoBehaviour
+{
+    public Transform CamaraPrincipal;
+    public Rigidbody rb;
+    //Variables para apuntar
+    public float velocidadDeApuntado = 5f;
+    public float limiteIzquierdo = -2f;
+    public float limiteDerecho = 2f;
+    public float fuerzaDeLanzamiento = 1000f;
+    private bool haSidoLanzada = false;
+
+    void Start()
+    {
+    }
+
+    void Update()
+    {
+        //Expresión: mientras que haSidoLanzada sea falso puedes disparar.
+        if (haSidoLanzada == false)
+        {
+            Apuntar();
+            if (Input.GetKeyDown(KeyCode.Space))
+            {
+                Lanzar();
+            }
+        }
+    }
+
+    void Apuntar()
+    {
+        float inputHorizontal = Input.GetAxis("Horizontal");
+        transform.Translate(Vector3.right * inputHorizontal * velocidadDeApuntado * Time.deltaTime);
+
+        Vector3 posicionActual = transform.position;
+        posicionActual.x = Mathf.Clamp(posicionActual.x, limiteIzquierdo, limiteDerecho);
+        transform.position = posicionActual;
+    }
+
+    void Lanzar()
+    {
+        haSidoLanzada = true;
+        rb.AddForce(Vector3.forward * fuerzaDeLanzamiento);
+
+        if (CamaraPrincipal != null)
+        {
+            CamaraPrincipal.SetParent(transform); // <-- Esta línea causa la rotación indeseada
+        }
+    }
+}
+
+Problema Adicional: "Actualmente con esa script la camara sigue la bola pero roda con ella, yo solo quiero que la siga sin que la camara ruede como la bola."
+
+
+
+2. Solución de la IA y Guía de Implementación
+La causa del problema es usar CamaraPrincipal.SetParent(transform);, lo que hace que la cámara herede la rotación de la bola. La solución es eliminar esa línea y usar un script dedicado de seguimiento en LateUpdate.
+
+🛠️ Guía Paso a Paso para la Cámara de Seguimiento
+Preparación del Script ControlBola: Eliminar la línea CamaraPrincipal.SetParent(transform); de la función Lanzar().
+
+Creación del Script SeguimientoCamara: Crear un nuevo script en el proyecto con ese nombre.
+
+Implementación del Código de Seguimiento: Pegar el código de SeguimientoCamara.cs (ver sección 2.3) en el nuevo archivo.
+
+Configuración de la Jerarquía de Unity:
+
+Adjuntar el script SeguimientoCamara al objeto Main Camera.
+
+En el Inspector de la Main Camera, arrastrar el objeto de la Bola de Boliche al slot Objetivo.
+
+Ajuste de Posición (Offset): Colocar la cámara en la escena a la posición deseada (detrás y encima de la bola) y luego copiar esos valores de posición (X, Y, Z) al slot Offset del script SeguimientoCamara en el Inspector.
+
+
+
+2.1. Código Corregido de la Bola (ControlBola.cs)
+Este es el código final que debe ir en la carpeta Scripts.
+
+C#
+
+using UnityEngine;
+
+public class ControlBola : MonoBehaviour
+{
+    // Ya NO se necesita la variable CamaraPrincipal aquí
+    // public Transform CamaraPrincipal; 
+
+    public Rigidbody rb;
+    public float velocidadDeApuntado = 5f;
+    public float limiteIzquierdo = -2f;
+    public float limiteDerecho = 2f;
+    public float fuerzaDeLanzamiento = 1000f;
+
+    private bool haSidoLanzada = false;
+
+    void Start()
+    {
+        if (rb == null)
+        {
+            rb = GetComponent<Rigidbody>();
+        }
+    }
+
+    void Update()
+    {
+        if (haSidoLanzada == false)
+        {
+            Apuntar();
+            if (Input.GetKeyDown(KeyCode.Space))
+            {
+                Lanzar();
+            }
+        }
+    }
+
+    void Apuntar()
+    {
+        float inputHorizontal = Input.GetAxis("Horizontal");
+        transform.Translate(Vector3.right * inputHorizontal * velocidadDeApuntado * Time.deltaTime);
+
+        Vector3 posicionActual = transform.position;
+        posicionActual.x = Mathf.Clamp(posicionActual.x, limiteIzquierdo, limiteDerecho);
+        transform.position = posicionActual;
+    }
+
+    void Lanzar()
+    {
+        haSidoLanzada = true;
+        rb.AddForce(Vector3.forward * fuerzaDeLanzamiento);
+
+        // ¡LÍNEA ELIMINADA! Ya no se hace la cámara hija de la bola.
+        // if(CamaraPrincipal !=null)
+        // {
+        //     CamaraPrincipal.SetParent(transform);
+        // }
+    }
+}
+
+
+
+2.2. Nuevo Script de Cámara (SeguimientoCamara.cs)
+Este script usa LateUpdate para asegurar un movimiento suave y libre de rotaciones indeseadas. Este es el código que debe ir en la carpeta Scripts.
+
+C#
+
+using UnityEngine;
+
+public class SeguimientoCamara : MonoBehaviour
+{
+    // El Transform de la bola que queremos seguir
+    public Transform Objetivo; 
+
+    // Distancia fija que queremos mantener con respecto a la bola (ej: detrás 5u, arriba 2u)
+    public Vector3 Offset = new Vector3(0f, 2f, -5f); 
+
+    // Suavidad del seguimiento. Mayor valor = más rápido.
+    public float Suavidad = 5f; 
+
+    void LateUpdate()
+    {
+        if (Objetivo == null)
+        {
+            Debug.LogError("El script SeguimientoCamara necesita un 'Objetivo' (la bola) asignado en el Inspector.");
+            return;
+        }
+
+        // 1. Calculamos la posición deseada (posición de la bola + el Offset)
+        Vector3 posicionDeseada = Objetivo.position + Offset;
+
+        // 2. Aplicamos un movimiento suave (Vector3.Lerp)
+        Vector3 posicionSuavizada = Vector3.Lerp(transform.position, posicionDeseada, Suavidad * Time.deltaTime);
+
+        // 3. Aplicamos la nueva posición a la cámara
+        transform.position = posicionSuavizada;
+
+        // 4. Mantenemos la cámara mirando hacia el frente de la pista, o hacia la bola (opcional)
+        // transform.LookAt(Objetivo);
+    }
+}
